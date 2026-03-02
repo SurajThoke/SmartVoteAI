@@ -124,31 +124,29 @@ app.post("/api/otp/send", async (req, res) => {
     // Always log to console for debugging
     console.log(`OTP for ${email}: ${otp}`);
     
-    // Attempt to send real email
-    try {
-      await transporter.sendMail({
-        from: `"SmartVoteAI" <${process.env.SMTP_USER || 'noreply@smartvote.ai'}>`,
-        to: email,
-        subject: "Your OTP for SmartVoteAI Registration",
-        text: `Your OTP is ${otp}. It expires in 2 minutes.`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 12px;">
-            <h2 style="color: #0f172a; margin-bottom: 16px;">SmartVoteAI Verification</h2>
-            <p style="color: #475569; font-size: 16px; line-height: 1.5;">
-              Your One-Time Password (OTP) for registration is:
-            </p>
-            <div style="background: #f8fafc; padding: 16px; text-align: center; border-radius: 8px; margin: 24px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563eb;">${otp}</span>
-            </div>
-            <p style="color: #64748b; font-size: 14px;">
-              This code will expire in 2 minutes. If you did not request this, please ignore this email.
-            </p>
+    // Send email in background (don't await) to prevent frontend lag
+    transporter.sendMail({
+      from: `"SmartVoteAI" <${process.env.SMTP_USER || 'noreply@smartvote.ai'}>`,
+      to: email,
+      subject: "Your OTP for SmartVoteAI Registration",
+      text: `Your OTP is ${otp}. It expires in 2 minutes.`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #0f172a; margin-bottom: 16px;">SmartVoteAI Verification</h2>
+          <p style="color: #475569; font-size: 16px; line-height: 1.5;">
+            Your One-Time Password (OTP) for registration is:
+          </p>
+          <div style="background: #f8fafc; padding: 16px; text-align: center; border-radius: 8px; margin: 24px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563eb;">${otp}</span>
           </div>
-        `,
-      });
-    } catch (mailError) {
-      console.error("Failed to send real email:", mailError);
-    }
+          <p style="color: #64748b; font-size: 14px;">
+            This code will expire in 2 minutes. If you did not request this, please ignore this email.
+          </p>
+        </div>
+      `,
+    }).catch(mailError => {
+      console.error("Background Email Error:", mailError);
+    });
 
     logEvent('otp', 'success', 'OTP sent', email, req);
     res.json({ success: true, message: "OTP sent to email" });
