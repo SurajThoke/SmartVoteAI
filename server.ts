@@ -8,6 +8,7 @@ import { supabase } from "./src/lib/supabase.ts";
 import dotenv from "dotenv";
 import { Resend } from "resend";
 import path from "path";
+import fs from "fs";
 
 dotenv.config();
 
@@ -435,6 +436,8 @@ app.post("/api/vote/cast", async (req, res) => {
 // --- Vite Integration ---
 
 async function startServer() {
+  console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
+  
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -442,11 +445,19 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static("dist"));
+    const distPath = path.resolve("dist");
+    const indexPath = path.join(distPath, "index.html");
+    
+    if (!fs.existsSync(indexPath)) {
+      console.error(`CRITICAL ERROR: index.html not found at ${indexPath}. Make sure 'npm run build' completed successfully.`);
+    }
+
+    app.use(express.static(distPath));
+    
     // SPA fallback: serve index.html for all non-API routes
     app.get("*", (req, res) => {
       if (!req.path.startsWith("/api")) {
-        res.sendFile(path.resolve("dist/index.html"));
+        res.sendFile(indexPath);
       }
     });
   }
