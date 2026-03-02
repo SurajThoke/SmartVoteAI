@@ -35,3 +35,4 @@ Secure AI-Powered Digital Voting Platform.
 5. Add the environment variables from `.env.example`.
 # Smart-Vote-AI
 # SmartVoteAI
+# SmartVoteAI
