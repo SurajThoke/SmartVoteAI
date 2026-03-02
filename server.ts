@@ -7,6 +7,7 @@ import CryptoJS from "crypto-js";
 import { supabase } from "./src/lib/supabase.ts";
 import dotenv from "dotenv";
 import { Resend } from "resend";
+import path from "path";
 
 dotenv.config();
 
@@ -109,6 +110,7 @@ app.post("/api/otp/send", async (req, res) => {
     
     // Send email via Resend in background
     if (process.env.RESEND_API_KEY) {
+      console.log(`Attempting to send OTP email to ${email} via Resend...`);
       resend.emails.send({
         from: 'SmartVoteAI <onboarding@resend.dev>',
         to: email,
@@ -127,7 +129,13 @@ app.post("/api/otp/send", async (req, res) => {
             </p>
           </div>
         `,
-      }).catch(err => console.error("Resend Error:", err));
+      }).then(response => {
+        console.log("Resend Success:", response);
+      }).catch(err => {
+        console.error("Resend Error Details:", err);
+      });
+    } else {
+      console.warn("RESEND_API_KEY is missing. OTP email will not be sent.");
     }
 
     logEvent('otp', 'success', 'OTP sent', email, req);
@@ -435,6 +443,12 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
+    // SPA fallback: serve index.html for all non-API routes
+    app.get("*", (req, res) => {
+      if (!req.path.startsWith("/api")) {
+        res.sendFile(path.resolve("dist/index.html"));
+      }
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
