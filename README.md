@@ -34,3 +34,4 @@ Secure AI-Powered Digital Voting Platform.
 4. Set **Start Command**: `node server.ts`
 5. Add the environment variables from `.env.example`.
 # Smart-Vote-AI
+# SmartVoteAI
