@@ -1,0 +1,5 @@
+{
+  "name": "SmartVoteAI",
+  "description": "Secure AI-powered digital voting platform with face recognition and audit logging.",
+  "requestFramePermissions": ["camera"]
+}

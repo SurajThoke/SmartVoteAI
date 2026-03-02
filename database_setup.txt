@@ -1,0 +1,31 @@
+# SmartVoteAI - Database Setup Guide
+
+SmartVoteAI uses SQLite for local development and is designed to be easily migrated to PostgreSQL or MongoDB for production.
+
+## Current Schema (SQLite)
+
+The application automatically initializes the database schema on startup in `src/db.ts`.
+
+### Tables:
+
+1. **voters**: Stores voter details and encrypted face embeddings.
+2. **admins**: Stores administrative credentials (hashed).
+3. **elections**: Stores election metadata and timelines.
+4. **candidates**: Stores candidate information linked to elections.
+5. **votes**: Stores anonymized, hashed votes with transaction IDs.
+6. **audit_logs**: Stores system-wide activity logs for security auditing.
+
+## Production Migration (PostgreSQL)
+
+To migrate to PostgreSQL:
+1. Replace `better-sqlite3` with `pg` or `prisma`.
+2. Update `src/db.ts` to connect to your PostgreSQL instance using environment variables.
+3. The SQL schema provided in `src/db.ts` is standard SQL and can be used to create tables in PostgreSQL with minor adjustments (e.g., using `UUID` type instead of `TEXT` for IDs).
+
+## Environment Variables
+
+Ensure the following are set in your production environment:
+- `DATABASE_URL`: Connection string for your database.
+- `JWT_SECRET`: A strong secret for signing tokens.
+- `ENCRYPTION_KEY`: A 32-character key for AES encryption.
+- `GEMINI_API_KEY`: For AI-generated election descriptions.
