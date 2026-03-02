@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import CryptoJS from "crypto-js";
 import { supabase } from "./src/lib/supabase.ts";
 import dotenv from "dotenv";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 dotenv.config();
 
@@ -18,25 +18,8 @@ app.use(express.json({ limit: '10mb' }));
 const JWT_SECRET = process.env.JWT_SECRET || "smart-vote-ai-super-secret-key-2026";
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "face-embedding-encryption-key-32-chars-long!";
 
-// --- Mailer Setup ---
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.ethereal.email",
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER || "demo@example.com",
-    pass: process.env.SMTP_PASS || "password",
-  },
-});
-
-// Verify mailer connection on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.warn("Mailer configuration warning: SMTP is not configured for real emails. OTPs will still be logged to the console.");
-  } else {
-    console.log("Mailer is ready to send real emails.");
-  }
-});
+// --- Resend Setup ---
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // --- Helper Functions ---
 
@@ -109,7 +92,7 @@ app.post("/api/admin/login", async (req, res) => {
 app.post("/api/otp/send", async (req, res) => {
   const { email } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 2 * 60 * 1000).toISOString(); // 2 minutes
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
 
   try {
     // Check if voter already exists
@@ -124,29 +107,28 @@ app.post("/api/otp/send", async (req, res) => {
     // Always log to console for debugging
     console.log(`OTP for ${email}: ${otp}`);
     
-    // Send email in background (don't await) to prevent frontend lag
-    transporter.sendMail({
-      from: `"SmartVoteAI" <${process.env.SMTP_USER || 'noreply@smartvote.ai'}>`,
-      to: email,
-      subject: "Your OTP for SmartVoteAI Registration",
-      text: `Your OTP is ${otp}. It expires in 2 minutes.`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-          <h2 style="color: #0f172a; margin-bottom: 16px;">SmartVoteAI Verification</h2>
-          <p style="color: #475569; font-size: 16px; line-height: 1.5;">
-            Your One-Time Password (OTP) for registration is:
-          </p>
-          <div style="background: #f8fafc; padding: 16px; text-align: center; border-radius: 8px; margin: 24px 0;">
-            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563eb;">${otp}</span>
+    // Send email via Resend in background
+    if (process.env.RESEND_API_KEY) {
+      resend.emails.send({
+        from: 'SmartVoteAI <onboarding@resend.dev>',
+        to: email,
+        subject: "Your OTP for SmartVoteAI Registration",
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <h2 style="color: #0f172a; margin-bottom: 16px;">SmartVoteAI Verification</h2>
+            <p style="color: #475569; font-size: 16px; line-height: 1.5;">
+              Your One-Time Password (OTP) for registration is:
+            </p>
+            <div style="background: #f8fafc; padding: 16px; text-align: center; border-radius: 8px; margin: 24px 0;">
+              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563eb;">${otp}</span>
+            </div>
+            <p style="color: #64748b; font-size: 14px;">
+              This code will expire in 5 minutes. If you did not request this, please ignore this email.
+            </p>
           </div>
-          <p style="color: #64748b; font-size: 14px;">
-            This code will expire in 2 minutes. If you did not request this, please ignore this email.
-          </p>
-        </div>
-      `,
-    }).catch(mailError => {
-      console.error("Background Email Error:", mailError);
-    });
+        `,
+      }).catch(err => console.error("Resend Error:", err));
+    }
 
     logEvent('otp', 'success', 'OTP sent', email, req);
     res.json({ success: true, message: "OTP sent to email" });
