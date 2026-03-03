@@ -435,6 +435,8 @@ app.post("/api/vote/cast", async (req, res) => {
 
 // --- Vite Integration ---
 
+// --- Vite Integration ---
+
 async function startServer() {
   console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
   
@@ -443,14 +445,16 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
+
     app.use(vite.middlewares);
-  }   } else {
+
+  } else {
     const distPath = path.resolve("dist");
     const indexPath = path.join(distPath, "index.html");
 
     app.use(express.static(distPath));
 
-    // ✅ Proper SPA fallback
+    // Proper SPA fallback
     app.get("*", (req, res) => {
       if (req.path.startsWith("/api")) {
         return res.status(404).json({ error: "API route not found" });
@@ -459,9 +463,9 @@ async function startServer() {
     });
   }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 }
 
 startServer();
