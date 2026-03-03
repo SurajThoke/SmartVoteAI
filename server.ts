@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import CryptoJS from "crypto-js";
 import { supabase } from "./src/lib/supabase.ts";
 import dotenv from "dotenv";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import path from "path";
 import fs from "fs";
 
@@ -20,10 +20,26 @@ app.use(express.json({ limit: '10mb' }));
 const JWT_SECRET = process.env.JWT_SECRET || "smart-vote-ai-super-secret-key-2026";
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "face-embedding-encryption-key-32-chars-long!";
 
-// --- Resend Setup ---
-const resend = new Resend(process.env.RESEND_API_KEY);
+/* =========================
+   BREVO SMTP SETUP
+========================= */
 
-// --- Helper Functions ---
+const transporter = nodemailer.createTransport({
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_SMTP_USER,
+    pass: process.env.BREVO_SMTP_PASS,
+  },
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+});
+
+/* =========================
+   Helper Functions
+========================= */
 
 const logEvent = async (eventType: string, status: string, description: string, userIdentifier: string, req: express.Request) => {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -45,7 +61,9 @@ const decrypt = (ciphertext: string) => {
   return bytes.toString(CryptoJS.enc.Utf8);
 };
 
-// --- Auth Middleware ---
+/* =========================
+   Auth Middleware
+========================= */
 
 const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
@@ -60,13 +78,14 @@ const authenticateToken = (req: any, res: any, next: any) => {
   });
 };
 
-// --- API Routes ---
+/* =========================
+   API Routes
+========================= */
 
 // Admin Login
 app.post("/api/admin/login", async (req, res) => {
   const { email, password } = req.body;
   
-  // For demo, if no admin exists, create one
   const { count } = await supabase.from('admins').select('*', { count: 'exact', head: true });
   if (count === 0) {
     const hashedPassword = await bcrypt.hash("admin123", 10);
@@ -94,10 +113,9 @@ app.post("/api/admin/login", async (req, res) => {
 app.post("/api/otp/send", async (req, res) => {
   const { email } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
   try {
-    // Check if voter already exists
     const { data: existing } = await supabase.from('voters').select('*').eq('email', email).single();
     if (existing) {
       return res.status(400).json({ error: "Email already registered" });
@@ -106,41 +124,30 @@ app.post("/api/otp/send", async (req, res) => {
     await supabase.from('otps').delete().eq('email', email);
     await supabase.from('otps').insert({ email, otp, expires_at: expiresAt });
 
-    // Always log to console for debugging
     console.log(`OTP for ${email}: ${otp}`);
-    
-    // Send email via Resend in background
-    if (process.env.RESEND_API_KEY) {
-      console.log(`Attempting to send OTP email to ${email} via Resend...`);
-      await resend.emails.send({
-        from: 'onboarding@resend.dev',
-        to: email,
-        subject: "Your OTP for SmartVoteAI Registration",
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #0f172a; margin-bottom: 16px;">SmartVoteAI Verification</h2>
-            <p style="color: #475569; font-size: 16px; line-height: 1.5;">
-              Your One-Time Password (OTP) for registration is:
-            </p>
-            <div style="background: #f8fafc; padding: 16px; text-align: center; border-radius: 8px; margin: 24px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563eb;">${otp}</span>
-            </div>
-            <p style="color: #64748b; font-size: 14px;">
-              This code will expire in 5 minutes. If you did not request this, please ignore this email.
-            </p>
-          </div>
-        `,
-      }).then(response => {
-        console.log("Resend Success:", response);
-      }).catch(err => {
-        console.error("Resend Error Details:", err);
-      });
-    } else {
-      console.warn("RESEND_API_KEY is missing. OTP email will not be sent.");
-    }
+
+    // Respond immediately
+    res.json({ success: true, message: "OTP sent to email" });
+
+    // Send email in background
+    transporter.sendMail({
+      from: `"SmartVoteAI" <${process.env.BREVO_SMTP_USER}>`,
+      to: email,
+      subject: "Your OTP for SmartVoteAI Registration",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #0f172a;">SmartVoteAI Verification</h2>
+          <p>Your OTP is:</p>
+          <h1 style="letter-spacing: 8px; color: #2563eb;">${otp}</h1>
+          <p>This code will expire in 5 minutes.</p>
+        </div>
+      `,
+    })
+    .then(() => console.log("Brevo OTP email sent"))
+    .catch(err => console.error("Brevo SMTP Error:", err));
 
     logEvent('otp', 'success', 'OTP sent', email, req);
-    res.json({ success: true, message: "OTP sent to email" });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to send OTP" });
@@ -180,7 +187,6 @@ app.post("/api/otp/verify", async (req, res) => {
   logEvent('otp', 'success', 'OTP verified', email, req);
   res.json({ success: true, message: "OTP verified successfully" });
 });
-
 // Voter Registration
 app.post("/api/voter/register", async (req, res) => {
   const { firstName, middleName, lastName, mobile, email, aadhaar, voterId, faceEmbedding } = req.body;
@@ -454,10 +460,9 @@ async function startServer() {
 
     app.use(express.static(distPath));
 
-    // Proper SPA fallback
     app.get("*", (req, res) => {
-  res.sendFile(indexPath);
-});
+      res.sendFile(indexPath);
+    });
   }
 
   app.listen(PORT, () => {
