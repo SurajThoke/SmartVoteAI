@@ -113,7 +113,7 @@ app.post("/api/otp/send", async (req, res) => {
     if (process.env.RESEND_API_KEY) {
       console.log(`Attempting to send OTP email to ${email} via Resend...`);
       await resend.emails.send({
-        from: 'SmartVoteAI <onboarding@resend.dev>',
+        from: 'onboarding@resend.dev',
         to: email,
         subject: "Your OTP for SmartVoteAI Registration",
         html: `
