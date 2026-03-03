@@ -456,11 +456,8 @@ async function startServer() {
 
     // Proper SPA fallback
     app.get("*", (req, res) => {
-      if (req.path.startsWith("/api")) {
-        return res.status(404).json({ error: "API route not found" });
-      }
-      res.sendFile(indexPath);
-    });
+  res.sendFile(indexPath);
+});
   }
 
   app.listen(PORT, () => {
