@@ -444,21 +444,18 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  }   } else {
     const distPath = path.resolve("dist");
     const indexPath = path.join(distPath, "index.html");
-    
-    if (!fs.existsSync(indexPath)) {
-      console.error(`CRITICAL ERROR: index.html not found at ${indexPath}. Make sure 'npm run build' completed successfully.`);
-    }
 
     app.use(express.static(distPath));
-    
-    // SPA fallback: serve index.html for all non-API routes
+
+    // ✅ Proper SPA fallback
     app.get("*", (req, res) => {
-      if (!req.path.startsWith("/api")) {
-        res.sendFile(indexPath);
+      if (req.path.startsWith("/api")) {
+        return res.status(404).json({ error: "API route not found" });
       }
+      res.sendFile(indexPath);
     });
   }
 
