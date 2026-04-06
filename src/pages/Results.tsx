@@ -150,7 +150,7 @@ export const Results = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {results.sort((a, b) => b.votes - a.votes).map((candidate, i) => (
+                    {[...results].sort((a, b) => b.votes - a.votes).map((candidate, i) =>  (
                       <tr key={candidate.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4 font-bold text-slate-900">{candidate.name}</td>
                         <td className="px-6 py-4 text-slate-500">{candidate.party_name}</td>
