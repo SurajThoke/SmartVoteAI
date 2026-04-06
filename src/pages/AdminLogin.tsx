@@ -99,7 +99,6 @@ export const AdminLogin = () => {
         </form>
         
         <p className="mt-8 text-center text-xs text-slate-400">
-          Default credentials: admin@smartvote.ai / admin123
         </p>
       </motion.div>
     </div>
